@@ -1,14 +1,13 @@
 package com.synectiks.pref.business.service;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Example;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 
 import com.synectiks.pref.config.Constants;
@@ -27,14 +26,36 @@ import com.synectiks.pref.service.util.DateFormatUtil;
 public class CmsAuthorizedSignatoryService {
 
 	private final Logger logger = LoggerFactory.getLogger(this.getClass());
-	
+
     @Autowired
     BranchRepository branchRepository;
 
     @Autowired
     AuthorizedSignatoryRepository authorizedSignatoryRepository;
-    
-    
+
+    public List<AuthorizedSignatory> getAuthorizedSignatoryListOnFilterCriteria(Map<String, String> criteriaMap){
+        AuthorizedSignatory obj = new AuthorizedSignatory();
+        boolean isFilter = false;
+        if(criteriaMap.get("id") != null) {
+            obj.setId(Long.parseLong(criteriaMap.get("id")));
+            isFilter = true;
+        }
+        if(criteriaMap.get("name") != null) {
+            obj.setName(criteriaMap.get("name"));
+            isFilter = true;
+        }
+        List<AuthorizedSignatory> list = null;
+        if(isFilter) {
+            list = this.authorizedSignatoryRepository.findAll(Example.of(obj), Sort.by(Sort.Direction.DESC, "id"));
+        }else {
+            list = this.authorizedSignatoryRepository.findAll(Sort.by(Sort.Direction.DESC, "id"));
+        }
+
+        Collections.sort(list, (o1, o2) -> o2.getId().compareTo(o1.getId()));
+        return list;
+    }
+
+
     public List<CmsAuthorizedSignatoryVo> getAuthorizedSignatoryList(){
 //    	AuthorizedSignatory as = new AuthorizedSignatory();
 //    	Optional<Branch> oBranch = branchRepository.findAll();
@@ -44,18 +65,18 @@ public class CmsAuthorizedSignatoryService {
 //    		logger.warn("Branch not found for the given branch id: "+branchId+". Returning empty authorizedSignatory list.");
 //    		return Collections.emptyList();
 //    	}
-    	
+
     	List<AuthorizedSignatory> list = this.authorizedSignatoryRepository.findAll();
     	List<CmsAuthorizedSignatoryVo> ls = changeAuthorizedSignatoryToCmsAuthorizedSignatoryList(list);
     	Collections.sort(ls, (o1, o2) -> o2.getId().compareTo(o1.getId()));
     	return ls;
     }
-    
+
     private List<CmsAuthorizedSignatoryVo> changeAuthorizedSignatoryToCmsAuthorizedSignatoryList(List<AuthorizedSignatory> list){
     	List<CmsAuthorizedSignatoryVo> ls = new ArrayList<>();
     	for(AuthorizedSignatory as: list) {
     		CmsAuthorizedSignatoryVo vo = CommonUtil.createCopyProperties(as, CmsAuthorizedSignatoryVo.class);
-    		
+
     		if(as.getCreatedOn() != null) {
             	vo.setStrCreatedOn(DateFormatUtil.changeLocalDateFormat(as.getCreatedOn(), CmsConstants.DATE_FORMAT_dd_MM_yyyy));
             	vo.setCreatedOn(null);
@@ -66,14 +87,14 @@ public class CmsAuthorizedSignatoryService {
             }
             if(as.getBranch() != null) {
             	vo.setBranchId(as.getBranch().getId());
-            	CmsBranchVo cmsBvo =CommonUtil.createCopyProperties(as.getBranch(), CmsBranchVo.class); 
+            	CmsBranchVo cmsBvo =CommonUtil.createCopyProperties(as.getBranch(), CmsBranchVo.class);
         		vo.setCmsBranchVo(cmsBvo);
             }
             ls.add(vo);
     	}
     	return ls;
     }
-    
+
     public CmsAuthorizedSignatoryVo saveAuthorizedSignatory(AuthorizedSignatoryInput cmsAuthorizedSignatoryVo) {
     	logger.info("Saving authorizedSignatory");
     	CmsAuthorizedSignatoryVo vo = null;
@@ -99,7 +120,7 @@ public class CmsAuthorizedSignatoryService {
         	if(oBranch.isPresent()) {
         		authorizedSignatory.setBranch(oBranch.get());
         	}
-        	
+
         	authorizedSignatory = authorizedSignatoryRepository.save(authorizedSignatory);
         	vo = CommonUtil.createCopyProperties(authorizedSignatory, CmsAuthorizedSignatoryVo.class);
         	vo.setStrCreatedOn(authorizedSignatory.getCreatedOn() != null ? DateFormatUtil.changeLocalDateFormat(authorizedSignatory.getCreatedOn(), CmsConstants.DATE_FORMAT_dd_MM_yyyy) : "");
@@ -107,10 +128,10 @@ public class CmsAuthorizedSignatoryService {
         	vo.setCreatedOn(null);
         	vo.setUpdatedOn(null);
         	if(oBranch.isPresent()) {
-        		CmsBranchVo cmsBvo =CommonUtil.createCopyProperties(oBranch.get(), CmsBranchVo.class); 
+        		CmsBranchVo cmsBvo =CommonUtil.createCopyProperties(oBranch.get(), CmsBranchVo.class);
         		vo.setCmsBranchVo(cmsBvo);
         	}
-        	
+
         	vo.setExitCode(0L);
         	if(cmsAuthorizedSignatoryVo.getId() == null) {
         		vo.setExitDescription("AuthorizedSignatory is added successfully");
@@ -119,7 +140,7 @@ public class CmsAuthorizedSignatoryService {
         		vo.setExitDescription("AuthorizedSignatory is updated successfully");
         		logger.debug("AuthorizedSignatory is updated successfully");
         	}
-        	
+
         }catch(Exception e) {
         	vo = new CmsAuthorizedSignatoryVo();
         	vo.setExitCode(1L);
